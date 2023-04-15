@@ -9,9 +9,8 @@ import "src/ClaimBuyouts.sol";
 
 contract Vault is ERC721Holder, ERC1155Supply {
     IERC721 vaultNftAddy;
-
-
-    //
+    
+    //@default wait time
     uint64 constant minimumWaitTime = 1 days;   
 
 
@@ -58,10 +57,8 @@ contract Vault is ERC721Holder, ERC1155Supply {
     function deposit(
         uint256 _tokenId,
         uint256 _fractions,
-        uint256 _minimumBuyoutWaitTime,
         uint256 _minimumPrice
     ) external {
-        tokeIdsDetailsMapping[_tokenId].minimumBuyoutWaitTime = _minimumBuyoutWaitTime;
         tokeIdsDetailsMapping[_tokenId].minimumPrice = _minimumPrice;
 
         vaultNftAddy.safeTransferFrom(msg.sender, address(this), _tokenId);
