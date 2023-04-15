@@ -41,9 +41,8 @@ contract Vault is ERC721Holder, ERC1155Supply {
     
     
 
-    constructor(IERC721 _nftAddress,address _controller, claimBuyOuts _claimContract) {
+    constructor(IERC721 _nftAddress, claimBuyOuts _claimContract) {
         vaultNftAddy = _nftAddress;
-        controller = _controller;
         claimContract = _claimContract;
     }
 

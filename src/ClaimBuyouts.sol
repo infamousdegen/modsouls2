@@ -30,8 +30,6 @@ contract claimBuyOuts{
     //@note: uint256 = nft tokenId
     mapping(address => mapping(address =>uint256[])) public failedNftClaim;
 
-    mapping(address => uint256) public bidAmount;
-
     constructor(address _controller, vaultFactory _vaultFactory){
  
         controller = _controller;
@@ -89,10 +87,7 @@ contract claimBuyOuts{
 
     }
 
-        //@note:Should be only called by Vault.sol
-    function depositBitMoney(address _addy) external {
-        bidAmount[_addy] = bidAmount[_addy] + msg.value;
-    }
+    
 
      
 
