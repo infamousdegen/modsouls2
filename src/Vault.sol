@@ -17,11 +17,6 @@ contract Vault is ERC721Holder, ERC1155Supply {
     //@note: Claim Contract
     claimBuyOuts immutable claimContract;
 
-    //@note:Make these struct updatable
-    struct tokenIdDetails {
-        uint256 minimumBuyoutWaitTime;
-        uint256 minimumPrice;
-    }
 
     struct buyOutDetails {
         uint256 lastBidPrice;
@@ -32,7 +27,8 @@ contract Vault is ERC721Holder, ERC1155Supply {
         address lastBidder;
     }
 
-    mapping(uint256 => tokenIdDetails) public tokeIdsDetailsMapping;
+    //@note: Minimum Price Mapping
+    mapping(uint256 => uint256) public minimumPriceMapping;
 
     mapping(uint256 => buyOutDetails) public buyOutDetailsMapping;
 
@@ -42,7 +38,8 @@ contract Vault is ERC721Holder, ERC1155Supply {
     mapping(address => uint256) public depositAmount;
 
     //@note: If the transfer fails adding it to the claims which can be claimed later by the lastbidder
-    mapping(address => uint256[]) private claims;
+    
+    
 
     constructor(IERC721 _nftAddress,address _controller, claimBuyOuts _claimContract) {
         vaultNftAddy = _nftAddress;
@@ -59,13 +56,12 @@ contract Vault is ERC721Holder, ERC1155Supply {
         uint256 _fractions,
         uint256 _minimumPrice
     ) external {
-        tokeIdsDetailsMapping[_tokenId].minimumPrice = _minimumPrice;
+        minimumPriceMapping[_tokenId] = _minimumPrice;
 
         vaultNftAddy.safeTransferFrom(msg.sender, address(this), _tokenId);
         _mint(msg.sender, _tokenId, _fractions);
     }
 
-    //@todo: Only controller should cal lthis function
 
     //@todo: Only has to call the first time buyout has started
     //@Need to Call only the first time
@@ -75,7 +71,7 @@ contract Vault is ERC721Holder, ERC1155Supply {
         //@Directly use here to save an mload
         
         require(
-            msg.value > tokeIdsDetailsMapping[_tokenId].minimumPrice,
+            msg.value > minimumPriceMapping[_tokenId],
             "The amount is too low"
         );
 
@@ -145,38 +141,35 @@ contract Vault is ERC721Holder, ERC1155Supply {
 
         require(success,"Transfer Failed");
 
-        //@note: Freeing the storage slot saves you gas
-
         delete buyOutDetailsMapping[_tokenId];
 
-        delete tokeIdsDetailsMapping[_tokenId];
+        delete minimumPriceMapping[_tokenId];
 
 
-        //@note: following checks and effect 
         try vaultNftAddy.safeTransferFrom(address(this), lastDepositor, _tokenId){
             //@emit an event here 
         }
-        //@note: If the claims fails push it to the claims array mapping 
         catch{
-            claims[lastDepositor].push(_tokenId);
+            vaultNftAddy.approve(claimContract, _tokenId);
+            claimContract.depositFailedTransferNft(vaultNftAddy, _tokenId, lastDepositor);
         }
 
     }
 
-    //@note: If you have the entire totalSupply of the issued tokens you can withdraw
-    //@audit: _burn will revert if the tokenId holder is not the owner of the entire supply
+
     function withdraw(uint256 _tokenId) external {
 
         _burn(msg.sender,_tokenId,totalSupply(_tokenId));
 
-         delete tokeIdsDetailsMapping[_tokenId];
+         delete minimumPriceMapping[_tokenId];
         
         try vaultNftAddy.safeTransferFrom(address(this), msg.sender, _tokenId){
             //@emit an event here 
         }
         //@note: If the claims fails push it to the claims array mapping 
         catch{
-            claims[lastDepositor].push(_tokenId);
+            vaultNftAddy.approve(claimContract, _tokenId);
+            claimContract.depositFailedTransferNft(vaultNftAddy, _tokenId, lastDepositor);
         }
     }
 

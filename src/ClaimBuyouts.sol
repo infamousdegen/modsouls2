@@ -9,6 +9,9 @@ import "src/vaultFactory.sol";
 
 import "src/Vault.sol";
 
+import "lib/openzeppelin-contracts/contracts/token/ERC721/IERC721.sol";
+
+
 
 
 contract claimBuyOuts{
@@ -21,6 +24,13 @@ contract claimBuyOuts{
     address immutable controller;
 
     vaultFactory immutable vaultFactory;
+
+    //@note: First depositorAddress
+    //@note: Inside address is for nft contract
+    //@note: uint256 = nft tokenId
+    mapping(address => mapping(address =>uint256[])) public failedNftClaim;
+
+    mapping(address => uint256) public bidAmount;
 
     constructor(address _controller, vaultFactory _vaultFactory){
  
@@ -40,24 +50,48 @@ contract claimBuyOuts{
     //@todo: Vault Registry
     function claimBalance(address _NftContract,uint256 _tokenId) external {
 
-        /*Query Vault Address From Here 
-    
-        */
         Vault vault = vaultFactory.vaultRegistry(_NftContract);
 
-
-        uint256 totalSupply = vault.totalSupply(_tokenId);
-
-        uint256 balanceOf = vault.balanceOf(msg.sender,_tokenId);
-
         //@note: this is the total UnclaimedBalance
-        uint256 corresPondingBalance = totalClaimAmount[keccak256(abi.encodePacked(address(vault),_tokenId))];
+        uint256 corresPondingBalance = totalClaimAmount[keccak256(
+                                        abi.encodePacked(address(vault),_tokenId))];
 
-        uint256 amountToSend = balanceOf.mulDivUp(corresPondingBalance,totalSupply);
+        uint256 amountToSend = vault.balanceOf(msg.sender,_tokenId).mulDivUp(
+                               corresPondingBalance,vault.totalSupply(_tokenId));
 
         require(vault.burn(msg.sender,_tokenId),"Burn Failed");
 
         payable(msg.sender).call{value:amountToSend};
+    }
+
+
+    //@note:Should be only called by Vault.sol
+    function depositFailedTransferNft(
+            IERC721 _NftContract,
+            uint256 _tokenId,
+            address _bidder) 
+            external {
+                
+            require(_NftContract.safeTransferFrom(msg.sender, address(this), _tokenId));
+            failedNftClaim[_bidder][_NftContract].push(_tokenId);
+    }
+
+    function claimAllFailedNft(IERC721 _NftContract) external{
+
+        uint256[] memory tokenIdArray = failedNftClaim[msg.sender][_NftContract];
+
+        for(uint256 i; i < tokenIdArray.length;){
+            _NftContract.safeTransferFrom(address(this), msg.sender, tokenIdArray[i]);
+            unchecked {
+                ++i;
+            }
+        }
+
+    }
+
+        //@note:Should be only called by Vault.sol
+    function depositBitMoney(address _addy) external {
+        bidAmount[_addy] = bidAmount[_addy] + msg.value;
     }
 
      
