@@ -75,7 +75,7 @@ contract Vault is ERC721Holder, ERC1155Supply {
         //@note: I can directly do sstore instead of sloading it and caching the value to save the gas
         buyOutDetailsMapping[_tokenId].lastBidPrice = msg.value;
 
-        buyOutDetailsMapping[_tokenId].lastBidTime = block.timestamp;
+        buyOutDetailsMapping[_tokenId].lastBidTime = uint64(block.timestamp);
 
         buyOutDetailsMapping[_tokenId].buyOutStarted = 1;
 
@@ -93,7 +93,7 @@ contract Vault is ERC721Holder, ERC1155Supply {
 
         require(msg.value > buyoutCache.lastBidPrice, "Minimum Bid amount must be greater than last bid ");
 
-        buyoutCache.lastBidTime = block.timestamp;
+        buyoutCache.lastBidTime = uint64(block.timestamp);
 
         buyoutCache.lastBidPrice = msg.value;
 
@@ -142,7 +142,7 @@ contract Vault is ERC721Holder, ERC1155Supply {
             //@emit an event here 
         }
         catch{
-            vaultNftAddy.approve(claimContract, _tokenId);
+            vaultNftAddy.approve(address(claimContract), _tokenId);
             claimContract.depositFailedTransferNft(vaultNftAddy, _tokenId, lastDepositor);
         }
 
@@ -160,7 +160,7 @@ contract Vault is ERC721Holder, ERC1155Supply {
         }
         //@note: If the claims fails push it to the claims array mapping 
         catch{
-            vaultNftAddy.approve(claimContract, _tokenId);
+            vaultNftAddy.approve(address(claimContract), _tokenId);
             claimContract.depositFailedTransferNft(vaultNftAddy, _tokenId, msg.sender);
         }
     }
@@ -168,11 +168,11 @@ contract Vault is ERC721Holder, ERC1155Supply {
     //@note: Should Be called by ClaimBuyouts.sol
     function burn(address from,uint256 id) external{
 
-        require(msg.sender == claimContract,"Not Claim Contract");
+        require(msg.sender == address(claimContract),"Not Claim Contract");
 
         uint256 amount = balanceOf(from, id);
 
-        _burn(from,id,amount,amount);
+        _burn(from,id,amount);
     }
 
     function withdrawBidMoney(uint256 _amount) external {
@@ -183,7 +183,7 @@ contract Vault is ERC721Holder, ERC1155Supply {
 
         depositAmount[msg.sender] = depositAmount[msg.sender] - _amount;
 
-        (bool success,) = payable(msg.sender).call{value:_amount};
+        (bool success,) = payable(msg.sender).call{value:_amount}();
         require(success,"Transfer Failed");
     }
 
