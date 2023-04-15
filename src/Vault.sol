@@ -52,7 +52,7 @@ contract Vault is ERC721Holder, ERC1155Supply {
         minimumPriceMapping[_tokenId] = _minimumPrice;
 
         vaultNftAddy.safeTransferFrom(msg.sender, address(this), _tokenId);
-        _mint(msg.sender, _tokenId, _fractions);
+        _mint(msg.sender, _tokenId, _fractions,"");
     }
 
 
@@ -184,7 +184,7 @@ contract Vault is ERC721Holder, ERC1155Supply {
 
         depositAmount[msg.sender] = depositAmount[msg.sender] - _amount;
 
-        (bool success,) = payable(msg.sender).call{value:_amount}();
+        (bool success,) = payable(msg.sender).call{value:_amount}("");
         require(success,"Transfer Failed");
     }
 
