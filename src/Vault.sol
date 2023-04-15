@@ -34,7 +34,8 @@ contract Vault is ERC721Holder, ERC1155Supply {
     mapping(address => uint256) public depositAmount;
     
     
-    constructor(IERC721 _nftAddress, claimBuyOuts _claimContract) {
+    //@note:Change this right now 
+    constructor(IERC721 _nftAddress, claimBuyOuts _claimContract)ERC1155("Random") {
         vaultNftAddy = _nftAddress;
         claimContract = _claimContract;
     }
