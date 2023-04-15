@@ -10,6 +10,7 @@ contract Vault is ERC721Holder, ERC1155Supply {
     IERC721 vaultNftAddy;
 
 
+
     uint64 constant minimumWaitTime = 1 days;   
 
     //@note: controller contract
@@ -146,7 +147,7 @@ contract Vault is ERC721Holder, ERC1155Supply {
 
         delete tokeIdsDetailsMapping[_tokenId];
 
-        
+
 
         //@note: following checks and effect 
         try vaultNftAddy.safeTransferFrom(address(this), lastDepositor, _tokenId){
@@ -174,6 +175,16 @@ contract Vault is ERC721Holder, ERC1155Supply {
         catch{
             claims[lastDepositor].push(_tokenId);
         }
+    }
+
+    //@note: Should Be called by ClaimBuyouts.sol
+    function burn(address from,uint256 id) external{
+
+        require(msg.sender == claimContract,"Not Claim Contract");
+
+        uint256 amount = balanceOf(from, id);
+
+        _burn(from,id,amount,amount);
     }
 
 
