@@ -8,7 +8,7 @@ import "lib/openzeppelin-contracts/contracts/token/ERC1155/extensions/ERC1155Sup
 import "src/ClaimBuyouts.sol";
 
 contract Vault is ERC721Holder, ERC1155Supply {
-    IERC721 vaultNftAddy;
+    IERC721 immutable vaultNftAddy;
     
     //@default wait time
     uint64 constant minimumWaitTime = 1 days;   
@@ -21,7 +21,6 @@ contract Vault is ERC721Holder, ERC1155Supply {
     struct buyOutDetails {
         uint256 lastBidPrice;
 
-        //@note: Pack All of this into one 
         uint64 lastBidTime;
         uint8 buyOutStarted;
         address lastBidder;
@@ -32,15 +31,9 @@ contract Vault is ERC721Holder, ERC1155Supply {
 
     mapping(uint256 => buyOutDetails) public buyOutDetailsMapping;
 
-
-    //@note: This will help you to keep track of how much was deposit 
-    //@note: Not sending it in the same transaction because of security issues (ddos attack)
     mapping(address => uint256) public depositAmount;
-
-    //@note: If the transfer fails adding it to the claims which can be claimed later by the lastbidder
     
     
-
     constructor(IERC721 _nftAddress, claimBuyOuts _claimContract) {
         vaultNftAddy = _nftAddress;
         claimContract = _claimContract;
@@ -74,7 +67,7 @@ contract Vault is ERC721Holder, ERC1155Supply {
             "The amount is too low"
         );
 
-        require(!buyOutDetailsMapping[_tokenId].buyOutStarted,
+        require(buyOutDetailsMapping[_tokenId].buyOutStarted !=1,
             "Buyout has already initialised");
 
         require(vaultNftAddy.ownerOf(_tokenId) == address(this),"Nft not found");
@@ -134,7 +127,7 @@ contract Vault is ERC721Holder, ERC1155Supply {
          depositAmount[lastDepositor] = depositAmount[lastDepositor] - buyoutCache.lastBidPrice;
 
 
-        (bool success,) = claimContract.call{value: buyoutCache.lastBidPrice}
+        (bool success,) = address(claimContract).call{value: buyoutCache.lastBidPrice}
                         (abi.encodeWithSignature("receiveDeposit(bytes32)", 
                         keccak256(abi.encodePacked(address(this),_tokenId))));
 
@@ -168,7 +161,7 @@ contract Vault is ERC721Holder, ERC1155Supply {
         //@note: If the claims fails push it to the claims array mapping 
         catch{
             vaultNftAddy.approve(claimContract, _tokenId);
-            claimContract.depositFailedTransferNft(vaultNftAddy, _tokenId, lastDepositor);
+            claimContract.depositFailedTransferNft(vaultNftAddy, _tokenId, msg.sender);
         }
     }
 

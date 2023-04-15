@@ -23,14 +23,14 @@ contract claimBuyOuts{
 
     address immutable controller;
 
-    vaultFactory immutable vaultFactory;
+    VaultFactory immutable vaultFactory;
 
     //@note: First depositorAddress
     //@note: Inside address is for nft contract
     //@note: uint256 = nft tokenId
     mapping(address => mapping(address =>uint256[])) public failedNftClaim;
 
-    constructor(address _controller, vaultFactory _vaultFactory){
+    constructor(address _controller, VaultFactory _vaultFactory){
  
         controller = _controller;
 

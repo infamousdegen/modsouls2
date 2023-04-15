@@ -9,7 +9,7 @@ import "src/Vault.sol";
 
 import "lib/openzeppelin-contracts/contracts/access/Ownable2Step.sol";
 
-contract vaultFactory is Ownable2Step{
+contract VaultFactory is Ownable2Step{
 
     //@todo: Make this updatable
     address public controller;
