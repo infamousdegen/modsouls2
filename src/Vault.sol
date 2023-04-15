@@ -5,19 +5,18 @@ pragma solidity ^0.8.13;
 import "lib/openzeppelin-contracts/contracts/token/ERC721/IERC721.sol";
 import "lib/openzeppelin-contracts/contracts/token/ERC721/utils/ERC721Holder.sol";
 import "lib/openzeppelin-contracts/contracts/token/ERC1155/extensions/ERC1155Supply.sol";
+import "src/ClaimBuyouts.sol";
 
 contract Vault is ERC721Holder, ERC1155Supply {
     IERC721 vaultNftAddy;
 
 
-
+    //
     uint64 constant minimumWaitTime = 1 days;   
 
-    //@note: controller contract
-    address immutable controller;
 
     //@note: Claim Contract
-    address immutable claimContract;
+    claimBuyOuts immutable claimContract;
 
     //@note:Make these struct updatable
     struct tokenIdDetails {
@@ -28,11 +27,10 @@ contract Vault is ERC721Holder, ERC1155Supply {
     struct buyOutDetails {
         uint256 lastBidPrice;
 
-        //@note: Can pack all of this into one slot 
-        uint256 lastBidTime;
-        //@note: Bidder address and bool can be packed together to save gas
+        //@note: Pack All of this into one 
+        uint64 lastBidTime;
+        uint8 buyOutStarted;
         address lastBidder;
-        bool buyOutStarted;
     }
 
     mapping(uint256 => tokenIdDetails) public tokeIdsDetailsMapping;
@@ -47,7 +45,7 @@ contract Vault is ERC721Holder, ERC1155Supply {
     //@note: If the transfer fails adding it to the claims which can be claimed later by the lastbidder
     mapping(address => uint256[]) private claims;
 
-    constructor(IERC721 _nftAddress,address _controller,address _claimContract) {
+    constructor(IERC721 _nftAddress,address _controller, claimBuyOuts _claimContract) {
         vaultNftAddy = _nftAddress;
         controller = _controller;
         claimContract = _claimContract;
@@ -56,6 +54,7 @@ contract Vault is ERC721Holder, ERC1155Supply {
     //@todo: Only Controller should call this
     //@param: The tokenId you want to deposit into the vault
     //@param: the fractions you want to divide the nft's into
+
     function deposit(
         uint256 _tokenId,
         uint256 _fractions,
@@ -86,14 +85,14 @@ contract Vault is ERC721Holder, ERC1155Supply {
         require(!buyOutDetailsMapping[_tokenId].buyOutStarted,
             "Buyout has already initialised");
 
-        require(tokeIdsDetailsMapping[_tokenId]
-                ,"no id found");
+        require(vaultNftAddy.ownerOf(_tokenId) == address(this),"Nft not found");
+
         //@note: I can directly do sstore instead of sloading it and caching the value to save the gas
         buyOutDetailsMapping[_tokenId].lastBidPrice = msg.value;
 
         buyOutDetailsMapping[_tokenId].lastBidTime = block.timestamp;
 
-        buyOutDetailsMapping[_tokenId].buyOutStarted = true;
+        buyOutDetailsMapping[_tokenId].buyOutStarted = 1;
 
         buyOutDetailsMapping[_tokenId].lastBidder = msg.sender;
     }
@@ -105,7 +104,7 @@ contract Vault is ERC721Holder, ERC1155Supply {
     function bidOnNft(uint256 _tokenId) external {
         buyOutDetails memory buyoutCache = buyOutDetailsMapping[_tokenId];
 
-        require(buyoutCache.buyOutStarted, "Buyout hasn't initiated yet");
+        require(buyoutCache.buyOutStarted == 1, "Buyout hasn't initiated yet");
 
         require(msg.value > buyoutCache.lastBidPrice, "Minimum Bid amount must be greater than last bid ");
 
@@ -136,17 +135,24 @@ contract Vault is ERC721Holder, ERC1155Supply {
         //@note:caching the last deposit
         address lastDepositor = buyoutCache.lastBidder;
 
-        require(buyoutCache.buyOutStarted,"Buyout hasn't initialised yet");
+        require(buyoutCache.buyOutStarted == 1,"Buyout hasn't initialised yet");
 
         require((buyoutCache.lastBidTime + minimumWaitTime) >= block.timestamp, "Cannot Call end bid now");
 
          depositAmount[lastDepositor] = depositAmount[lastDepositor] - buyoutCache.lastBidPrice;
 
+
+        (bool success,) = claimContract.call{value: buyoutCache.lastBidPrice}
+                        (abi.encodeWithSignature("receiveDeposit(bytes32)", 
+                        keccak256(abi.encodePacked(address(this),_tokenId))));
+
+        require(success,"Transfer Failed");
+
         //@note: Freeing the storage slot saves you gas
+
         delete buyOutDetailsMapping[_tokenId];
 
         delete tokeIdsDetailsMapping[_tokenId];
-
 
 
         //@note: following checks and effect 
@@ -186,6 +192,21 @@ contract Vault is ERC721Holder, ERC1155Supply {
 
         _burn(from,id,amount,amount);
     }
+
+    function withdrawBidMoney(uint256 _amount) external {
+        //@note:Chaching here to save extra sloads
+        uint256 balance = depositAmount[msg.sender];
+
+        require(_amount >= balance, "Balance Exceeding amount");
+
+        depositAmount[msg.sender] = depositAmount[msg.sender] - _amount;
+
+        (bool success,) = payable(msg.sender).call{value:_amount};
+        require(success,"Transfer Failed");
+    }
+
+
+     
 
 
 

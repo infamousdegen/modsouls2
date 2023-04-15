@@ -5,6 +5,10 @@ pragma solidity ^0.8.13;
 
 import "lib/solmate/src/utils/FixedPointMathLib.sol";
 
+import "src/vaultFactory.sol";
+
+import "src/Vault.sol";
+
 
 
 contract claimBuyOuts{
@@ -16,13 +20,13 @@ contract claimBuyOuts{
 
     address immutable controller;
 
-    address immutable vaultRegistry;
+    vaultFactory immutable vaultFactory;
 
-    constructor(address _controller,address _vaultRegistry){
+    constructor(address _controller, vaultFactory _vaultFactory){
  
         controller = _controller;
 
-        vaultRegistry = _vaultRegistry;
+        vaultFactory = _vaultFactory;
 
     }
 
@@ -37,8 +41,10 @@ contract claimBuyOuts{
     function claimBalance(address _NftContract,uint256 _tokenId) external {
 
         /*Query Vault Address From Here 
-
+    
         */
+        Vault vault = vaultFactory.vaultRegistry(_NftContract);
+
 
         uint256 totalSupply = vault.totalSupply(_tokenId);
 
