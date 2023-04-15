@@ -10,7 +10,13 @@ contract Vault is ERC721Holder, ERC1155Supply {
     IERC721 vaultNftAddy;
 
 
-    uint64 constant minimumWaitTime = 1 days;
+    uint64 constant minimumWaitTime = 1 days;   
+
+    //@note: controller contract
+    address immutable controller;
+
+    //@note: Claim Contract
+    address immutable claimContract;
 
     //@note:Make these struct updatable
     struct tokenIdDetails {
@@ -40,8 +46,10 @@ contract Vault is ERC721Holder, ERC1155Supply {
     //@note: If the transfer fails adding it to the claims which can be claimed later by the lastbidder
     mapping(address => uint256[]) private claims;
 
-    constructor(IERC721 _nftAddress) {
+    constructor(IERC721 _nftAddress,address _controller,address _claimContract) {
         vaultNftAddy = _nftAddress;
+        controller = _controller;
+        claimContract = _claimContract;
     }
 
     //@todo: Only Controller should call this
@@ -53,8 +61,7 @@ contract Vault is ERC721Holder, ERC1155Supply {
         uint256 _minimumBuyoutWaitTime,
         uint256 _minimumPrice
     ) external {
-        tokeIdsDetailsMapping[_tokenId]
-            .minimumBuyoutWaitTime = _minimumBuyoutWaitTime;
+        tokeIdsDetailsMapping[_tokenId].minimumBuyoutWaitTime = _minimumBuyoutWaitTime;
         tokeIdsDetailsMapping[_tokenId].minimumPrice = _minimumPrice;
 
         vaultNftAddy.safeTransferFrom(msg.sender, address(this), _tokenId);
@@ -65,6 +72,8 @@ contract Vault is ERC721Holder, ERC1155Supply {
 
     //@todo: Only has to call the first time buyout has started
     //@Need to Call only the first time
+
+    //@issue: Can Initialise a buyout without having the token id 
     function initiateBuyout(uint256 _tokenId) external {
         //@Directly use here to save an mload
         
@@ -76,7 +85,8 @@ contract Vault is ERC721Holder, ERC1155Supply {
         require(!buyOutDetailsMapping[_tokenId].buyOutStarted,
             "Buyout has already initialised");
 
-
+        require(tokeIdsDetailsMapping[_tokenId]
+                ,"no id found");
         //@note: I can directly do sstore instead of sloading it and caching the value to save the gas
         buyOutDetailsMapping[_tokenId].lastBidPrice = msg.value;
 
@@ -117,8 +127,8 @@ contract Vault is ERC721Holder, ERC1155Supply {
                 1) Should this be called by anyone 
                 2) Should this be called only by last Bidder*/
 
-                
-        function endBid(uint256 _tokenId) external {
+
+    function endBid(uint256 _tokenId) external {
         buyOutDetails memory buyoutCache = buyOutDetailsMapping[_tokenId];
 
 
@@ -134,7 +144,9 @@ contract Vault is ERC721Holder, ERC1155Supply {
         //@note: Freeing the storage slot saves you gas
         delete buyOutDetailsMapping[_tokenId];
 
-        _unsafeBurn(_tokenId,totalSupply(_tokenId));
+        delete tokeIdsDetailsMapping[_tokenId];
+
+        
 
         //@note: following checks and effect 
         try vaultNftAddy.safeTransferFrom(address(this), lastDepositor, _tokenId){
@@ -153,6 +165,8 @@ contract Vault is ERC721Holder, ERC1155Supply {
 
         _burn(msg.sender,_tokenId,totalSupply(_tokenId));
 
+         delete tokeIdsDetailsMapping[_tokenId];
+        
         try vaultNftAddy.safeTransferFrom(address(this), msg.sender, _tokenId){
             //@emit an event here 
         }
@@ -163,22 +177,5 @@ contract Vault is ERC721Holder, ERC1155Supply {
     }
 
 
-    //@note:Extremely unsafe burn 
 
-    //@note: The amount has to be entire supply 
-    function _unsafeBurn(uint256 _tokenId,uint256 amount) internal {
-
-        uint256[] memory ids = _asSingletonArray(_tokenId);
-        uint256[] memory amounts = _asSingletonArray(amount);
-
-         _beforeTokenTransfer(address(this), address(this), address(0), ids, amounts, "");
-
-            //@note:Extreeeeemely unsafe burn
-            delete _balances[_tokenId];
-
-
-            emit TransferSingle(address(this), address(this), address(0), id, amount);
-          _afterTokenTransfer(operator, from, address(0), ids, amounts, "");
-
-    }
 }
