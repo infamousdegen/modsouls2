@@ -43,6 +43,7 @@ contract Vault is ERC721Holder, ERC1155Supply {
     //@todo: Only Controller should call this
     //@param: The tokenId you want to deposit into the vault
     //@param: the fractions you want to divide the nft's into
+    //@param: The Initial Minimum Price
 
     function deposit(
         uint256 _tokenId,
@@ -60,7 +61,7 @@ contract Vault is ERC721Holder, ERC1155Supply {
     //@Need to Call only the first time
 
     //@issue: Can Initialise a buyout without having the token id 
-    function initiateBuyout(uint256 _tokenId) external {
+    function initiateBuyout(uint256 _tokenId) external payable{
         //@Directly use here to save an mload
         
         require(
@@ -73,7 +74,6 @@ contract Vault is ERC721Holder, ERC1155Supply {
 
         require(vaultNftAddy.ownerOf(_tokenId) == address(this),"Nft not found");
 
-        //@note: I can directly do sstore instead of sloading it and caching the value to save the gas
         buyOutDetailsMapping[_tokenId].lastBidPrice = msg.value;
 
         buyOutDetailsMapping[_tokenId].lastBidTime = uint64(block.timestamp);
@@ -81,13 +81,15 @@ contract Vault is ERC721Holder, ERC1155Supply {
         buyOutDetailsMapping[_tokenId].buyOutStarted = 1;
 
         buyOutDetailsMapping[_tokenId].lastBidder = msg.sender;
+
+        depositAmount[msg.sender] = depositAmount[msg.sender] + msg.value;
     }
 
     //@todo: Only controller should cal lthis function
     //@note: This will save gas for subsequent bidders
 
     //@note: Instead of sending directly allow the user to claim from the contract 
-    function bidOnNft(uint256 _tokenId) external {
+    function bidOnNft(uint256 _tokenId) external payable{
         buyOutDetails memory buyoutCache = buyOutDetailsMapping[_tokenId];
 
         require(buyoutCache.buyOutStarted == 1, "Buyout hasn't initiated yet");
@@ -101,6 +103,7 @@ contract Vault is ERC721Holder, ERC1155Supply {
         buyoutCache.lastBidder = msg.sender;
     
         depositAmount[msg.sender] = depositAmount[msg.sender] + msg.value;
+
         //@note: Check whether the buyOutStarted is being changed over here 
         buyOutDetailsMapping[_tokenId] = buyoutCache;
     }
@@ -123,21 +126,14 @@ contract Vault is ERC721Holder, ERC1155Supply {
 
         require(buyoutCache.buyOutStarted == 1,"Buyout hasn't initialised yet");
 
-        require((buyoutCache.lastBidTime + minimumWaitTime) >= block.timestamp, "Cannot Call end bid now");
-
+        require(block.timestamp >= (buyoutCache.lastBidTime + minimumWaitTime), "Cannot Call end bid now");
          depositAmount[lastDepositor] = depositAmount[lastDepositor] - buyoutCache.lastBidPrice;
 
-
-        (bool success,) = address(claimContract).call{value: buyoutCache.lastBidPrice}
-                        (abi.encodeWithSignature("receiveDeposit(bytes32)", 
-                        keccak256(abi.encodePacked(address(this),_tokenId))));
-
-        require(success,"Transfer Failed");
+        claimContract.receiveDeposit{value:buyoutCache.lastBidPrice}(keccak256(abi.encodePacked(address(this),_tokenId)));
 
         delete buyOutDetailsMapping[_tokenId];
 
         delete minimumPriceMapping[_tokenId];
-
 
         try vaultNftAddy.safeTransferFrom(address(this), lastDepositor, _tokenId){
             //@emit an event here 
@@ -180,7 +176,8 @@ contract Vault is ERC721Holder, ERC1155Supply {
         //@note:Chaching here to save extra sloads
         uint256 balance = depositAmount[msg.sender];
 
-        require(_amount >= balance, "Balance Exceeding amount");
+
+        require(balance >= _amount, "Balance Exceeding amount");
 
         depositAmount[msg.sender] = depositAmount[msg.sender] - _amount;
 
